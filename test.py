@@ -3,3 +3,6 @@ import numpy as np
 y = np.array(x)
 y=y[:,:1]
 print(y)
+
+a = 200j
+print(a)

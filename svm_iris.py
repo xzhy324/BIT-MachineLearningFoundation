@@ -22,7 +22,8 @@ def loadData(filename, split_rate=0.8):
     """
     data = np.loadtxt(
         fname=filename,
-        delimiter=',',
+        dtype=float,  # 数据类型
+        delimiter=',',  # 分隔符
         converters={4: iris_type}  # 将第5列文字分类替换为数字
     )
     x, y = np.split(data, (4,), axis=1)  # 按列切分，前四列与后面切开
@@ -33,6 +34,8 @@ def loadData(filename, split_rate=0.8):
 def svm_classifier():
     return svm.SVC(
         kernel='linear',  # 设定为线性核,备选项：linear,rbf,sigmoid
+        decision_function_shape='ovr',  # 决策函数
+        C=0.8 # 误差惩罚系数
     )
 
 
@@ -49,31 +52,33 @@ def print_eval(classifier, x_train, y_train, x_test, y_test):
 
 
 def draw(classifier, x, y):
-    iris_feature = ['sepal length', 'sepal width']
-    # 开始画图
-    x1_min, x1_max = x[:, 0].min(), x[:, 0].max()
-    x2_min, x2_max = x[:, 1].min(), x[:, 1].max()
-    # 生成网格采样点
-    x1, x2 = np.mgrid[x1_min:x1_max:200j, x2_min:x2_max:200j]
+    """
+    将模型的分割平面以二维图着色的方式呈现，将样本点与真实标签放入染色平面中供对比
+    :param classifier: svm_classifier
+    :param x: iris sepal length && width
+    :param y: iris type
+    :return: None
+    """
+    cm_light = mpl.colors.ListedColormap(['#A0FFA0', '#FFA0A0', '#A0A0FF'])  # 底色
+    cm_dark = mpl.colors.ListedColormap(['g', 'r', 'b'])  # 样本点颜色
 
-    grid_test = np.stack((x1.flat, x2.flat), axis=1)
-    # print('grid_test:\n', grid_test[:2])
-    # 输出样本到决策面的距离
-    z = classifier.decision_function(grid_test)
-    print('the distance to decision plane:\n', z[:2])
-    grid_hat = classifier.predict(grid_test)
-    # 预测分类值 得到[0, 0, ..., 2, 2]
-    # print('grid_hat:\n', grid_hat[:2])
-    # 使得grid_hat 和 x1 形状一致
-    grid_hat = grid_hat.reshape(x1.shape)
-    cm_light = mpl.colors.ListedColormap(['#A0FFA0', '#FFA0A0', '#A0A0FF'])
-    cm_dark = mpl.colors.ListedColormap(['g', 'b', 'r'])
-    plt.pcolormesh(x1, x2, grid_hat, cmap=cm_light)  # 能够直观表现出分类边界
-
-    plt.scatter(x[:, 0], x[:, 1], c=np.squeeze(y), edgecolor='k', s=50, cmap=cm_dark)
-    plt.scatter(x_test[:, 0], x_test[:, 1], s=120, facecolor='none', zorder=10)
-    plt.xlabel(iris_feature[0], fontsize=20)
-    plt.ylabel(iris_feature[1], fontsize=20)
+    x1_min, x1_max = x[:, 0].min(), x[:, 0].max()  # 作为二维图的x轴
+    x2_min, x2_max = x[:, 1].min(), x[:, 1].max()  # 作为二维图的y轴
+    # 生成网格采样点,将每个点染色来表示分类的结果
+    epsilon = 0.01  # 格点精度
+    x1, x2 = np.mgrid[x1_min:x1_max:epsilon, x2_min:x2_max:epsilon]
+    # 将这些格点压缩为 n*2 数组，再交给模型预测
+    grid_set = np.stack((x1.flat, x2.flat), axis=1)
+    colored_set = classifier.predict(grid_set)   # 使用训练好的模型给格点标记
+    # 使得 预测后的结果序列 和 x1 ，x2的形状一致
+    colored_set = colored_set.reshape(x1.shape)
+    print(colored_set)
+    # 绘制模型预测的底色
+    plt.pcolormesh(x1, x2, colored_set, cmap=cm_light)  # pcolormesh()会根据预测之后的colored_set的结果自动在cmap里选择颜色
+    # 绘制真实的样本点
+    plt.scatter(x[:, 0], x[:, 1], c=np.squeeze(y), cmap=cm_dark)
+    plt.xlabel('sepal length', fontsize=20)
+    plt.ylabel('sepal width', fontsize=20)
     plt.xlim(x1_min, x1_max)
     plt.ylim(x2_min, x2_max)
     plt.title('Iris data classification via SVM', fontsize=30)
