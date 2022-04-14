@@ -88,7 +88,7 @@ def draw(classifier, x, y):
 
 if __name__ == '__main__':
     # 加载数据
-    x_train, x_test, y_train, y_test = loadData('./data/iris/iris.data')
+    x_train, x_test, y_train, y_test = loadData('data/iris/iris.data')
     # 训练模型
     model = svm_classifier()
     train(model, x_train, y_train)
