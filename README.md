@@ -29,4 +29,4 @@ x轴和y轴分别对应前两维，绘图范围是xy的可能值域，将平面�
 就能够清晰的看到模型预测和真实值的差异。效果如下图：
 
 
-![](.\svm_iris\result.png)
+![svm_iris_result](./svm_iris/result.png)
