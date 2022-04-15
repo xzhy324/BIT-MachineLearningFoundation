@@ -4,6 +4,7 @@ import csv
 from math import log2
 
 # 全局变量 ======================================
+# 这些值只会初始化一次，就不再改变
 
 max_depth = 0
 positive_class = ''
@@ -11,7 +12,6 @@ negative_class = ''
 positive_label = ''
 negative_label = ''
 train_major_class_value = ''
-test_major_class_value = ''
 
 
 # ==============================================
@@ -20,11 +20,11 @@ class TreeNode:
     # leave choice 只有当是叶子节点的时候有效; attr只有当非叶子节点时有效，此时左右子树必然存在
     def __init__(self, label=None, left_node=None, right_node=None, leaf_choice=None):
         # 非叶子节点的有效字段
-        self.label = label
-        self.left_child = left_node
-        self.right_child = right_node
+        self.label:str = label
+        self.left_child:TreeNode = left_node
+        self.right_child:TreeNode = right_node
         # 叶子节点的有效字段
-        self.leaf_choice = leaf_choice
+        self.leaf_choice:str = leaf_choice
 
 
 # 从tsv文件中加载数据集以及标签名称
@@ -45,7 +45,7 @@ def loadTsv(input_file):
 
 
 # 获取数据集中的主要分类的值
-def getMajorClassValue(dataSet):
+def getMajorClassValue(dataSet) -> str:
     pos, neg = 0, 0
     for data in dataSet:
         if data[-1] == positive_class:
@@ -56,7 +56,7 @@ def getMajorClassValue(dataSet):
 
 
 # 获取数据集中的正负分类的各自的数量
-def countClass(dataSet):
+def countClass(dataSet) -> (int, int):
     pos, neg = 0, 0
     for data in dataSet:
         if data[-1] == positive_class:
@@ -67,7 +67,7 @@ def countClass(dataSet):
 
 
 # 根据某一列的取值，将符合条件的若干行取出，并删去用于筛选的列
-def splitDataSet(dataSet, axis, value):
+def splitDataSet(dataSet, axis, value) -> []:
     ret_dataSet = []
     for data in dataSet:
         if data[axis] == value:
@@ -78,7 +78,7 @@ def splitDataSet(dataSet, axis, value):
 
 
 # 计算基于分类结果的信息熵
-def entropy(dataSet):
+def entropy(dataSet) -> float:
     p = 0
     for data in dataSet:
         if data[-1] == positive_class:
@@ -88,7 +88,7 @@ def entropy(dataSet):
 
 
 # 计算某一决策变量的信息熵
-def infoLabel(dataSet, labelIndex):
+def infoLabel(dataSet, labelIndex) -> float:
     dataSet_poslabel = [data for data in dataSet if data[labelIndex] == positive_label]
     dataSet_neglabel = [data for data in dataSet if data[labelIndex] == negative_label]
     Dp_size = len(dataSet_poslabel)
@@ -96,14 +96,15 @@ def infoLabel(dataSet, labelIndex):
     D_size = len(dataSet)
     return Dp_size / D_size * entropy(dataSet_poslabel) + Dn_size / D_size * entropy(dataSet_neglabel)
 
+
 # 递归生成决策树的核心算法
-def buildDecisionTree(dataSet, labels, dateSet_type="train", depth=0):
+def buildDecisionTree(dataSet, labels, depth=0) -> TreeNode:
     # 结束条件（叶子节点标志）
     classValues = [data[-1] for data in dataSet]
     if classValues.count(classValues[0]) == len(classValues):  # class列全相同
         return TreeNode(leaf_choice=classValues[0])
     if len(dataSet) == 0:
-        leaf_choice = train_major_class_value if dateSet_type == "train" else test_major_class_value
+        leaf_choice = train_major_class_value
         return TreeNode(leaf_choice=leaf_choice)
     if depth == max_depth:
         leaf_choice = getMajorClassValue(dataSet)
@@ -139,7 +140,7 @@ def buildDecisionTree(dataSet, labels, dateSet_type="train", depth=0):
         neg_n=neg_n,
         neg_class=negative_class
     ))
-    left_node = buildDecisionTree(left_dataSet, left_labels, dateSet_type, depth + 1)
+    left_node = buildDecisionTree(left_dataSet, left_labels, depth + 1)
 
     right_dataSet = splitDataSet(dataSet, chosen_label_index, negative_label)  # 根据选定标签的负值划分数据集
     right_labels = labels[:]  # 注意python对于列表传的是引用，需要复制一份再递归
@@ -153,9 +154,19 @@ def buildDecisionTree(dataSet, labels, dateSet_type="train", depth=0):
         neg_n=neg_n,
         neg_class=negative_class
     ))
-    right_node = buildDecisionTree(right_dataSet, right_labels, dateSet_type, depth + 1)
+    right_node = buildDecisionTree(right_dataSet, right_labels, depth + 1)
 
     return TreeNode(label=chosen_label, left_node=left_node, right_node=right_node)
+
+
+def predict(labels: [str], treeNode: TreeNode, x: [str]) -> str:
+    if not treeNode.left_child:
+        return treeNode.leaf_choice
+    index = labels.index(treeNode.label)
+    if x[index] == positive_label:
+        return predict(labels, treeNode.left_child, x)
+    else:
+        return predict(labels, treeNode.right_child, x)
 
 
 if __name__ == '__main__':
@@ -196,15 +207,37 @@ if __name__ == '__main__':
             negative_label = data[0]
             break
     train_major_class_value = getMajorClassValue(train_dataSet)
-    test_major_class_value = getMajorClassValue(test_dataSet)
 
     # 建立训练集决策树
-    pos_n,neg_n = countClass(train_dataSet)  # 为打印做准备
+    pos_n, neg_n = countClass(train_dataSet)  # 为打印做准备
     print("[{pos_n} {pos_class}/{neg_n} {neg_class}]".format(
         pos_n=pos_n,
         pos_class=positive_class,
         neg_n=neg_n,
         neg_class=negative_class
     ))
-    train_treeRoot = buildDecisionTree(train_dataSet, train_labels, "train")
+    train_treeRoot = buildDecisionTree(train_dataSet, train_labels)  # 注意此时train_labels已经被破坏了
 
+    error_test = 0
+    with open(test_output, 'w') as fp:
+        for test_data in test_dataSet:
+            # 使用完整的test_labels和训练好的决策树对训练集预测
+            result = predict(test_labels, train_treeRoot, test_data[:-1])
+            fp.write(result + '\n')
+            if result != test_data[-1]:
+                error_test += 1
+    error_test /= len(test_dataSet)
+
+    error_train = 0
+    with open(train_output, 'w') as fp:
+        for train_data in train_dataSet:
+            # 使用完整的test_labels和训练好的决策树对训练集预测
+            result = predict(test_labels, train_treeRoot, train_data[:-1])
+            fp.write(result + '\n')
+            if result != train_data[-1]:
+                error_train += 1
+    error_train /= len(train_dataSet)
+
+    with open(metrics_output, 'w') as fp:
+        fp.write("error(train): {}\n".format(error_train))
+        fp.write("error(test): {}\n".format(error_test))
