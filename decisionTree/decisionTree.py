@@ -6,12 +6,12 @@ from math import log2
 # 全局变量 ======================================
 # 这些值只会初始化一次，就不再改变
 
-max_depth = 0
-positive_class = ''
-negative_class = ''
-positive_label = ''
-negative_label = ''
-train_major_class_value = ''
+max_depth = 0  # 最大深度
+positive_class = ''  # 正分类名称
+negative_class = ''  # 负分类名称
+positive_label = ''  # 标签的正值
+negative_label = ''  # 标签的负值
+train_major_class_value = ''  # 训练集中的主要分类
 
 
 # ==============================================
@@ -20,11 +20,11 @@ class TreeNode:
     # leave choice 只有当是叶子节点的时候有效; attr只有当非叶子节点时有效，此时左右子树必然存在
     def __init__(self, label=None, left_node=None, right_node=None, leaf_choice=None):
         # 非叶子节点的有效字段
-        self.label:str = label
-        self.left_child:TreeNode = left_node
-        self.right_child:TreeNode = right_node
+        self.label: str = label
+        self.left_child: TreeNode = left_node
+        self.right_child: TreeNode = right_node
         # 叶子节点的有效字段
-        self.leaf_choice:str = leaf_choice
+        self.leaf_choice: str = leaf_choice
 
 
 # 从tsv文件中加载数据集以及标签名称
@@ -36,8 +36,8 @@ def loadTsv(input_file):
     """
     tsv = []
     with open(input_file, 'r') as fp:
-        tsvreader = csv.reader(fp, delimiter='\t')
-        for line in tsvreader:
+        tsvReader = csv.reader(fp, delimiter='\t')
+        for line in tsvReader:
             tsv.append(line)
     labels = tsv[0][:-1]
     dataSet = tsv[1:]
@@ -89,12 +89,12 @@ def entropy(dataSet) -> float:
 
 # 计算某一决策变量的信息熵
 def infoLabel(dataSet, labelIndex) -> float:
-    dataSet_poslabel = [data for data in dataSet if data[labelIndex] == positive_label]
-    dataSet_neglabel = [data for data in dataSet if data[labelIndex] == negative_label]
-    Dp_size = len(dataSet_poslabel)
-    Dn_size = len(dataSet_neglabel)
+    dataSet_pos_label = [data for data in dataSet if data[labelIndex] == positive_label]
+    dataSet_neg_label = [data for data in dataSet if data[labelIndex] == negative_label]
+    Dp_size = len(dataSet_pos_label)
+    Dn_size = len(dataSet_neg_label)
     D_size = len(dataSet)
-    return Dp_size / D_size * entropy(dataSet_poslabel) + Dn_size / D_size * entropy(dataSet_neglabel)
+    return Dp_size / D_size * entropy(dataSet_pos_label) + Dn_size / D_size * entropy(dataSet_neg_label)
 
 
 # 递归生成决策树的核心算法
@@ -103,10 +103,10 @@ def buildDecisionTree(dataSet, labels, depth=0) -> TreeNode:
     classValues = [data[-1] for data in dataSet]
     if classValues.count(classValues[0]) == len(classValues):  # class列全相同
         return TreeNode(leaf_choice=classValues[0])
-    if len(dataSet) == 0:
+    if len(dataSet) == 0:  # 没有样本
         leaf_choice = train_major_class_value
         return TreeNode(leaf_choice=leaf_choice)
-    if depth == max_depth:
+    if depth == max_depth:  # 到达最大深度
         leaf_choice = getMajorClassValue(dataSet)
         return TreeNode(leaf_choice=leaf_choice)
 
@@ -120,7 +120,7 @@ def buildDecisionTree(dataSet, labels, depth=0) -> TreeNode:
             max_IG = IG
             chosen_label = label
 
-    # 最大信息增益为0时，直接返回叶节点
+    # 最大信息增益为0时，直接返回叶节点，此时labels的列全同，数据集不可再分
     if max_IG == 0:
         leaf_choice = getMajorClassValue(dataSet)
         return TreeNode(leaf_choice=leaf_choice)
@@ -159,6 +159,7 @@ def buildDecisionTree(dataSet, labels, depth=0) -> TreeNode:
     return TreeNode(label=chosen_label, left_node=left_node, right_node=right_node)
 
 
+# 对一组决策变量根据决策树进行预测
 def predict(labels: [str], treeNode: TreeNode, x: [str]) -> str:
     if not treeNode.left_child:
         return treeNode.leaf_choice
@@ -167,6 +168,20 @@ def predict(labels: [str], treeNode: TreeNode, x: [str]) -> str:
         return predict(labels, treeNode.left_child, x)
     else:
         return predict(labels, treeNode.right_child, x)
+
+
+# 计算误差并持久化存储
+def calcErrorAndSave(treeRoot: TreeNode, dataSet, output_file: str, labels: [str]) -> float:
+    error = 0
+    with open(output_file, 'w') as fp:
+        for data in dataSet:
+            # 使用完整的test_labels和训练好的决策树对训练集预测
+            result = predict(labels, treeRoot, data[:-1])
+            fp.write(result + '\n')
+            if result != data[-1]:
+                error += 1
+    error /= len(dataSet)
+    return error
 
 
 if __name__ == '__main__':
@@ -218,25 +233,9 @@ if __name__ == '__main__':
     ))
     train_treeRoot = buildDecisionTree(train_dataSet, train_labels)  # 注意此时train_labels已经被破坏了
 
-    error_test = 0
-    with open(test_output, 'w') as fp:
-        for test_data in test_dataSet:
-            # 使用完整的test_labels和训练好的决策树对训练集预测
-            result = predict(test_labels, train_treeRoot, test_data[:-1])
-            fp.write(result + '\n')
-            if result != test_data[-1]:
-                error_test += 1
-    error_test /= len(test_dataSet)
-
-    error_train = 0
-    with open(train_output, 'w') as fp:
-        for train_data in train_dataSet:
-            # 使用完整的test_labels和训练好的决策树对训练集预测
-            result = predict(test_labels, train_treeRoot, train_data[:-1])
-            fp.write(result + '\n')
-            if result != train_data[-1]:
-                error_train += 1
-    error_train /= len(train_dataSet)
+    # 计算误差
+    error_test = calcErrorAndSave(train_treeRoot, test_dataSet, test_output, test_labels)
+    error_train = calcErrorAndSave(train_treeRoot, train_dataSet, train_output, test_labels)
 
     with open(metrics_output, 'w') as fp:
         fp.write("error(train): {}\n".format(error_train))
