@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import colors
 
+
 def iris_type(name):
     map = {
         b'Iris-setosa': 0,
@@ -33,9 +34,10 @@ def loadData(filename, split_rate=0.8):
 
 def svm_classifier():
     return svm.SVC(
-        kernel='linear',  # 设定为线性核,备选项：linear,rbf,sigmoid
+        kernel=kernel,  # 设定为线性核,备选项：linear,rbf,poly
         decision_function_shape='ovr',  # 决策函数
-        C=0.8 # 误差惩罚系数
+        C=0.8,  # 误差惩罚系数
+        gamma=10
     )
 
 
@@ -45,8 +47,8 @@ def train(classifier, x_train, y_train):
 
 def print_eval(classifier, x_train, y_train, x_test, y_test):
     # 输出准确率
-    print("train set prediction:%.3f" % classifier.score(x_train, y_train))
-    print("test set prediction:%.3f" % classifier.score(x_test, y_test))
+    print("train set prediction:%.5f" % classifier.score(x_train, y_train))
+    print("test set prediction:%.5f" % classifier.score(x_test, y_test))
     # 计算决策函数的值 表示x到各个分割平面的距离
     print('decision_function:\n', classifier.decision_function(x_train)[:2])
 
@@ -69,7 +71,7 @@ def draw(classifier, x, y):
     x1, x2 = np.mgrid[x1_min:x1_max:epsilon, x2_min:x2_max:epsilon]
     # 将这些格点压缩为 n*2 数组，再交给模型预测
     grid_set = np.stack((x1.flat, x2.flat), axis=1)
-    colored_set = classifier.predict(grid_set)   # 使用训练好的模型给格点标记
+    colored_set = classifier.predict(grid_set)  # 使用训练好的模型给格点标记
     # 使得 预测后的结果序列 和 x1 ，x2的形状一致
     colored_set = colored_set.reshape(x1.shape)
     print(colored_set)
@@ -81,7 +83,7 @@ def draw(classifier, x, y):
     plt.ylabel('sepal width', fontsize=20)
     plt.xlim(x1_min, x1_max)
     plt.ylim(x2_min, x2_max)
-    plt.title('Iris data classification via SVM', fontsize=30)
+    plt.title('Iris data classification via SVM[%s]' % kernel, fontsize=20)
     plt.grid()
     plt.show()
 
@@ -90,6 +92,7 @@ if __name__ == '__main__':
     # 加载数据
     x_train, x_test, y_train, y_test = loadData('data/iris/iris.data')
     # 训练模型
+    kernel = 'poly'  #备选项：linear,rbf,poly，注意是全局变量
     model = svm_classifier()
     train(model, x_train, y_train)
     # 输出模型评估结果
@@ -98,4 +101,3 @@ if __name__ == '__main__':
     draw(classifier=model,
          x=np.vstack((x_train, x_test)),
          y=np.vstack((y_train, y_test)))
-
