@@ -46,12 +46,7 @@ def loadTsv(input_file):
 
 # 获取数据集中的主要分类的值
 def getMajorClassValue(dataSet) -> str:
-    pos, neg = 0, 0
-    for data in dataSet:
-        if data[-1] == positive_class:
-            pos += 1
-        else:
-            neg += 1
+    pos, neg = countClass(dataSet)
     return positive_class if pos >= neg else negative_class
 
 
@@ -79,6 +74,8 @@ def splitDataSet(dataSet, axis, value) -> []:
 
 # 计算基于分类结果的信息熵
 def entropy(dataSet) -> float:
+    if not dataSet:     # 在计算infoLabel时，可能遇到空数据集，随便返回一个数
+        return -1
     p = 0
     for data in dataSet:
         if data[-1] == positive_class:
@@ -116,11 +113,18 @@ def buildDecisionTree(dataSet, labels, depth=0) -> TreeNode:
     info = entropy(dataSet)
     for index, label in enumerate(labels):
         IG = info - infoLabel(dataSet, index)
-        if IG > max_IG:
+        if IG > max_IG:     # 严格大于才更新记录，以确保平票的时候，找到的是第一个出现的标签
             max_IG = IG
             chosen_label = label
 
-    # 最大信息增益为0时，直接返回叶节点，此时labels的列全同，数据集不可再分
+    # 最大信息增益为0时，直接返回叶节点，此时有
+    # 有infoLabel == entropy(dataSet) != 0
+    # 可能的例子如下：
+    # label | class
+    # sunny | out
+    # windy | out
+    # sunny | in
+    # windy | in
     if max_IG == 0:
         leaf_choice = getMajorClassValue(dataSet)
         return TreeNode(leaf_choice=leaf_choice)
@@ -159,9 +163,9 @@ def buildDecisionTree(dataSet, labels, depth=0) -> TreeNode:
     return TreeNode(label=chosen_label, left_node=left_node, right_node=right_node)
 
 
-# 对一组决策变量根据决策树进行预测
+# 对一组决策变量x根据决策树以及标签进行预测
 def predict(labels: [str], treeNode: TreeNode, x: [str]) -> str:
-    if not treeNode.left_child:
+    if not treeNode.left_child:   # 当前已经是叶子节点，直接返回结果
         return treeNode.leaf_choice
     index = labels.index(treeNode.label)
     if x[index] == positive_label:
@@ -214,7 +218,7 @@ if __name__ == '__main__':
         if data[-1] != positive_class:
             negative_class = data[-1]
             break
-    if positive_class < negative_class:  # 保证positive_name是字典序较为靠后的那一个，平局时优先打印positive_name
+    if positive_class < negative_class:  # 保证positive_name是字典序较为靠后的那一个，平局时优先选择positive_name作为决策变量
         positive_class, negative_class = negative_class, positive_class
     positive_label = train_dataSet[0][0]
     for data in train_dataSet:
@@ -222,7 +226,8 @@ if __name__ == '__main__':
             negative_label = data[0]
             break
     train_major_class_value = getMajorClassValue(train_dataSet)
-
+    if positive_label < negative_label:  # 由于homework中未规定打印顺序，先按照字典逆序打印
+        positive_label, negative_label = negative_label, positive_label
     # 建立训练集决策树
     pos_n, neg_n = countClass(train_dataSet)  # 为打印做准备
     print("[{pos_n} {pos_class}/{neg_n} {neg_class}]".format(

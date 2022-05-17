@@ -35,10 +35,11 @@ def inspect(input_file, output_file):
             positive_num += 1
 
     p = positive_num / total_num
+    p = p if p >= 0.5 else 1 - p    # 取两者中数量大的作为标签
     entropy = -p * log2(p) - (1 - p) * log2(1 - p)
     error = 1 - p
 
-    saveData(output_file,entropy,error)
+    saveData(output_file, entropy, error)
 
 
 if __name__ == '__main__':
